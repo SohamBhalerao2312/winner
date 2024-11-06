@@ -1,0 +1,99 @@
+import keras
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Dense, Flatten, Dropout
+from keras.optimizers import Adam
+from keras.callbacks import TensorBoard
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from sklearn.metrics import roc_curve, auc
+from tensorflow.keras import utils as np_utils
+import seaborn as sns
+
+# Step 2: Load dataset
+data = np.load('ORL_faces.npz')
+x_train = np.array(data['trainX'], dtype='float32') / 255
+x_test = np.array(data['testX'], dtype='float32') / 255
+y_train = data['trainY']
+y_test = data['testY']
+
+print('x_train shape:', x_train.shape)
+print('y_train shape:', y_train.shape)
+print('x_test shape:', x_test.shape)
+
+# Step 3: Reshape images
+im_rows, im_cols = 112, 92
+im_shape = (im_rows, im_cols, 1)
+x_train = x_train.reshape(x_train.shape[0], *im_shape)
+x_test = x_test.reshape(x_test.shape[0], *im_shape)
+
+# Step 4: Build CNN Model
+cnn_model = Sequential([
+    Conv2D(36, kernel_size=7, activation='relu', input_shape=im_shape),
+    MaxPooling2D(pool_size=2),
+    Conv2D(54, kernel_size=5, activation='relu'),
+    MaxPooling2D(pool_size=2),
+    Flatten(),
+    Dense(2024, activation='relu'),
+    Dropout(0.5),
+    Dense(1024, activation='relu'),
+    Dropout(0.5),
+    Dense(512, activation='relu'),
+    Dropout(0.5),
+    Dense(20, activation='softmax')
+])
+cnn_model.compile(
+    loss='sparse_categorical_crossentropy',
+    optimizer=Adam(learning_rate=0.0001),
+    metrics=['accuracy']
+)
+
+# Step 5: Train Model
+history = cnn_model.fit(
+    x_train, y_train,
+    batch_size=512,
+    epochs=50,
+    verbose=2
+)
+
+# Step 6: Evaluate Model
+scor = cnn_model.evaluate(x_test, y_test, verbose=0)
+print('Test loss:', scor[0])
+print('Test accuracy:', scor[1])
+
+# Step 7: Plot training history
+plt.plot(history.history['accuracy'])
+plt.title('Model Accuracy')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(['train'], loc='upper left')
+plt.show()
+
+plt.plot(history.history['loss'])
+plt.title('Model Loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['train'], loc='upper left')
+plt.show()
+
+# Step 8: Make Predictions and Display Results
+predictions = cnn_model.predict(x_test)
+predicted_labels = np.argmax(predictions, axis=1)
+
+# Display some predictions
+for i in range(5):
+    plt.imshow(x_test[i].reshape(im_rows, im_cols), cmap='gray')
+    plt.title(f"Predicted: {predicted_labels[i]}, Actual: {y_test[i]}")
+    plt.show()
+
+# Classification report and confusion matrix
+print(classification_report(y_test, predicted_labels))
+cm = confusion_matrix(y_test, predicted_labels)
+plt.figure(figsize=(10, 10))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+plt.title("Confusion Matrix")
+plt.xlabel("Predicted Label")
+plt.ylabel("True Label")
+plt.show()
